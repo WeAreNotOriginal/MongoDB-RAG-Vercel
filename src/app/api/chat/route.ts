@@ -5,7 +5,36 @@ import { ConversationalRetrievalQAChain } from 'langchain/chains';
 import { vectorStore } from '@/utils/openai';
 import { NextResponse } from 'next/server';
 import { BufferMemory } from "langchain/memory";
+import { PineconeClient } from '@pinecone-database/pinecone';
 
+const pinecone = new PineconeClient();
+await pinecone.init({
+  apiKey: process.env.PINECONE_API_KEY,
+  environment: process.env.PINECONE_ENVIRONMENT,
+});
+
+const index = pinecone.Index('your-index-name');
+
+// Function to upsert embeddings
+async function upsertEmbeddings(texts, vectors) {
+  await index.upsert({
+    vectors: vectors.map((vector, idx) => ({
+      id: `text-${idx}`,
+      values: vector,
+      metadata: { text: texts[idx] },
+    })),
+  });
+}
+
+// Function to query embeddings
+async function queryEmbeddings(vector) {
+  const queryResponse = await index.query({
+    queryVector: vector,
+    topK: 5,
+    includeMetadata: true,
+  });
+  return queryResponse.matches;
+}
 
 export async function POST(req: Request) {
     try {
